@@ -32,13 +32,3 @@ This project builds on community research and official Ohuhu data:
 - Official color-code and image metadata was taken from Ohuhu's [Color Codes Index](https://br.ohuhu.com/pages/color-codes-index), including its embedded TableMaster data endpoint.
 
 Ohuhu is a trademark of its respective owner. This is an unofficial community tool.
-
-## Updating the Snapshot
-
-When the backend database changes, refresh the static snapshot from the project root:
-
-```bash
-./docs-sync.sh
-```
-
-Commit and push the updated `docs/db.json` for GitHub Pages.
