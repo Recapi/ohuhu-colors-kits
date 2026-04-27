@@ -10,7 +10,34 @@
 var STORAGE_KEY = 'ohuhu_state_v1';
 var THEME_KEY = 'theme';
 var AUTO_KEY = 'ohuhu_auto_advance';
+var LANG_KEY = 'ohuhu_lang';
 var DB_URL = './db.json';
+
+var lang = (function () {
+  try { return localStorage.getItem(LANG_KEY) || 'en'; } catch (e) { return 'en'; }
+})();
+function setLang(code) {
+  if (!window.OHUHU_I18N[code]) return;
+  lang = code;
+  try { localStorage.setItem(LANG_KEY, code); } catch (e) {}
+  document.documentElement.setAttribute('lang', code === 'pt' ? 'pt-BR' : 'en');
+  // re-translate <nav data-i18n> elements
+  document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  router();
+}
+function t(key, params) {
+  var dict = window.OHUHU_I18N[lang] || window.OHUHU_I18N.en;
+  var fallback = window.OHUHU_I18N.en;
+  var v = dict[key];
+  if (v == null) v = fallback[key];
+  if (v == null) return key;
+  if (params) Object.keys(params).forEach(function (k) {
+    v = v.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
+  });
+  return v;
+}
 
 var CDN = 'https://cdn.shopify.com/s/files/1/0555/4212/0735/files/';
 var IMAGE_OVERRIDES = {
@@ -321,36 +348,33 @@ function renderIndex(root, query) {
     + '<section class="page">'
     +   '<header class="page-header">'
     +     '<div>'
-    +       '<h1>Cores</h1>'
-    +       '<p class="muted">' + filtered.length + ' cores'
-    +       (q || broken || img ? ' · filtrado' : '')
-    +       ' · imagem oficial em cima · HEX armazenado abaixo · clique pra editar</p>'
+    +       '<h1>' + t('index.title') + '</h1>'
+    +       '<p class="muted">' + t('index.subtitle', { n: filtered.length, filtered: (q || broken || img) ? t('index.subtitle.filtered') : '' }) + '</p>'
     +     '</div>'
     +     '<form id="searchForm" class="search">'
-    +       '<input name="q" value="' + escapeAttr(q) + '" placeholder="Filtrar (prefixo: B, BG, RV3…)">'
-    +       (q || broken ? '<a href="#/" class="btn-ghost">Limpar</a>' : '')
+    +       '<input name="q" value="' + escapeAttr(q) + '" placeholder="' + escapeAttr(t('index.search_placeholder')) + '">'
+    +       (q || broken ? '<a href="#/" class="btn-ghost">' + t('common.clear') + '</a>' : '')
     +     '</form>'
     +   '</header>'
     +   '<div class="filter-chips">'
-    +     '<a class="chip ' + (!q && !broken && !img ? 'is-on' : '') + '" href="#/">Todas</a>'
+    +     '<a class="chip ' + (!q && !broken && !img ? 'is-on' : '') + '" href="#/">' + t('index.all') + '</a>'
     +     famList.map(function (f) {
             return '<a class="chip ' + (q.toUpperCase() === f ? 'is-on' : '') + '" href="#/?q=' + encodeURIComponent(f) + '">' + f + '</a>';
           }).join('')
-    +     (brokenCount ? '<a class="chip chip-warn ' + (broken ? 'is-on' : '') + '" href="#/?broken=1">Sem HEX <span class="chip-badge">' + brokenCount + '</span></a>' : '')
-    +     (missingImgCount ? '<a class="chip chip-warn ' + (img === 'missing' ? 'is-on' : '') + '" href="#/?img=missing">Sem imagem <span class="chip-badge">' + missingImgCount + '</span></a>' : '')
+    +     (brokenCount ? '<a class="chip chip-warn ' + (broken ? 'is-on' : '') + '" href="#/?broken=1">' + t('index.no_hex') + ' <span class="chip-badge">' + brokenCount + '</span></a>' : '')
+    +     (missingImgCount ? '<a class="chip chip-warn ' + (img === 'missing' ? 'is-on' : '') + '" href="#/?img=missing">' + t('index.no_image') + ' <span class="chip-badge">' + missingImgCount + '</span></a>' : '')
     +   '</div>'
     +   '<div class="filter-chips">'
-    +     '<span class="muted small" style="align-self:center;margin-right:4px;">Ordenar:</span>'
-    +     ['default:Original','code:Código','usage:Uso','hue:Matiz','light:Luminosidade'].map(function (pair) {
-            var s = pair.split(':');
-            return '<a class="chip ' + (sort === s[0] ? 'is-on' : '') + '" href="' + chipUrl({ sort: s[0] }) + '">' + s[1] + '</a>';
+    +     '<span class="muted small" style="align-self:center;margin-right:4px;">' + t('index.sort_label') + '</span>'
+    +     ['default','code','usage','hue','light'].map(function (key) {
+            return '<a class="chip ' + (sort === key ? 'is-on' : '') + '" href="' + chipUrl({ sort: key }) + '">' + t('index.sort.' + key) + '</a>';
           }).join('')
     +   '</div>'
     +   '<div class="swatch-grid">'
     +     filtered.map(function (c) {
             var imgSrc = imgUrl(c.code, c.image_url);
             return ''
-              + '<a class="swatch" href="#/colors/' + c.code + '" title="' + c.code + (c.hex ? ' · #' + c.hex : ' · sem HEX') + '">'
+              + '<a class="swatch" href="#/colors/' + c.code + '" title="' + c.code + (c.hex ? ' · #' + c.hex : ' · ' + t('common.no_hex')) + '">'
               +   '<span class="swatch-img-wrap">'
               +     '<img class="swatch-img" loading="lazy" alt="' + c.code + '" src="' + imgSrc + '"'
               +       ' onerror="if(this.src.includes(\'-color-code.png\')){this.src=this.src.replace(\'-color-code.png\',\'.png\');}else{this.classList.add(\'img-missing\');}">'
@@ -361,7 +385,7 @@ function renderIndex(root, query) {
               +   '<span class="swatch-code">' + c.code + (sort === 'usage' ? ' <span class="muted small">' + (usage[c.code] || 0) + '×</span>' : '') + '</span>'
               + '</a>';
           }).join('')
-    +     (filtered.length === 0 ? '<p class="muted">Nenhuma cor encontrada.</p>' : '')
+    +     (filtered.length === 0 ? '<p class="muted">' + t('index.no_results') + '</p>' : '')
     +   '</div>'
     + '</section>';
 
@@ -381,7 +405,7 @@ function renderIndex(root, query) {
 // ============================================================================
 function renderColorDetail(root, code) {
   var color = findColor(code);
-  if (!color) { root.innerHTML = '<section class="page"><h1>404</h1><p>Cor ' + escapeHtml(code) + ' não encontrada.</p></section>'; return; }
+  if (!color) { root.innerHTML = '<section class="page"><h1>404</h1><p>Color ' + escapeHtml(code) + ' not found.</p></section>'; return; }
   var kits = kitsContainingColor(code);
   var src = imgUrl(code, color.image_url);
 
@@ -396,12 +420,12 @@ function renderColorDetail(root, code) {
     +     '<div>'
     +       '<h1>' + escapeHtml(color.code) + (color.name ? ' <span class="muted" style="font-weight:400;font-size:1rem">· ' + escapeHtml(color.name) + '</span>' : '') + '</h1>'
     +       '<p class="muted">'
-    +         (color.hex ? 'HEX armazenado: <code>#' + color.hex + '</code>' : 'HEX inválido — corrija abaixo')
-    +         ' · em ' + kits.length + ' kit(s)'
-    +         (oldsParts.length ? ' · antigos: ' + oldsParts.join(' / ') : '')
+    +         (color.hex ? t('detail.hex_stored') + ' <code>#' + color.hex + '</code>' : t('detail.hex_invalid'))
+    +         ' · ' + t('common.in_n_kits', { n: kits.length })
+    +         (oldsParts.length ? ' · ' + t('detail.olds') + ' ' + oldsParts.join(' / ') : '')
     +       '</p>'
     +     '</div>'
-    +     '<a href="#/" class="btn-ghost">← Voltar</a>'
+    +     '<a href="#/" class="btn-ghost">' + t('common.back') + '</a>'
     +   '</header>'
     +   '<div class="compare-pair">'
     +     '<figure class="compare-pair-cell">'
@@ -411,34 +435,34 @@ function renderColorDetail(root, code) {
     +           ' onerror="if(this.src.includes(\'-color-code.png\')){this.src=this.src.replace(\'-color-code.png\',\'.png\');}else{this.classList.add(\'img-missing\');}">'
     +         '<span class="picker-marker" id="pickerMarker" hidden></span>'
     +       '</div>'
-    +       '<figcaption>Clique na imagem pra amostrar a cor</figcaption>'
+    +       '<figcaption>' + t('detail.click_to_sample') + '</figcaption>'
     +     '</figure>'
     +     '<figure class="compare-pair-cell">'
     +       '<span id="previewChip" class="compare-pair-chip' + (color.hex ? '' : ' swatch-broken') + '"' + (color.hex ? ' style="background:#' + color.hex + '"' : '') + '>' + (color.hex ? '' : '?') + '</span>'
-    +       '<figcaption id="previewCaption">' + (color.hex ? '#' + color.hex : 'sem HEX') + '</figcaption>'
+    +       '<figcaption id="previewCaption">' + (color.hex ? '#' + color.hex : t('common.no_hex')) + '</figcaption>'
     +     '</figure>'
     +   '</div>'
     +   '<div class="card">'
-    +     '<h2 class="section-title">Editar HEX</h2>'
+    +     '<h2 class="section-title">' + t('detail.edit_hex') + '</h2>'
     +     '<form id="hexForm" class="picker-form">'
     +       '<input type="color" id="colorInput" value="#' + (color.hex || 'ffffff') + '" aria-label="Color picker">'
-    +       '<input type="text" id="hexInput" name="hex_value" placeholder="ex.: a3cbe1" value="' + (color.hex || '') + '" maxlength="7" autocomplete="off">'
+    +       '<input type="text" id="hexInput" name="hex_value" placeholder="e.g.: a3cbe1" value="' + (color.hex || '') + '" maxlength="7" autocomplete="off">'
     +       '<button type="button" id="eyedropperBtn" class="btn-ghost" hidden>'
     +         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22l3-1 11-11M14 7l3 3M16 5l3 3M13 8l3 3"/></svg>'
-    +         'Conta-gotas'
+    +         t('detail.eyedropper')
     +       '</button>'
-    +       '<button type="submit" class="btn-primary">Salvar</button>'
-    +       '<label class="auto-toggle" title="Quando ligado, clicar na imagem (ou em Salvar) salva e pula pra próxima cor.">'
+    +       '<button type="submit" class="btn-primary">' + t('common.save') + '</button>'
+    +       '<label class="auto-toggle" title="' + escapeAttr(t('detail.fast_mode_tip')) + '">'
     +         '<input type="checkbox" id="autoAdvanceToggle">'
-    +         '<span>Modo rápido — clique salva e vai pra próxima cor</span>'
+    +         '<span>' + t('detail.fast_mode') + '</span>'
     +       '</label>'
-    +       '<span class="muted small">Clique na imagem, use o color picker, ou o conta-gotas do navegador.</span>'
+    +       '<span class="muted small">' + t('detail.hint') + '</span>'
     +     '</form>'
     +   '</div>'
-    +   '<h2 class="section-title">Aparece nos kits</h2>'
+    +   '<h2 class="section-title">' + t('detail.appears_in_kits') + '</h2>'
     +   (kits.length ? (
         '<div class="table-wrap"><table class="data-table">'
-        + '<thead><tr><th>Kit</th><th class="num">Tamanho</th><th class="num">Preço</th></tr></thead>'
+        + '<thead><tr><th>' + t('detail.kit') + '</th><th class="num">' + t('common.size') + '</th><th class="num">' + t('common.price') + '</th></tr></thead>'
         + '<tbody>'
         + kits.map(function (k) {
             return '<tr>'
@@ -448,7 +472,7 @@ function renderColorDetail(root, code) {
               + '</tr>';
           }).join('')
         + '</tbody></table></div>'
-      ) : '<p class="muted">Esta cor não está em nenhum kit cadastrado.</p>')
+      ) : '<p class="muted">' + t('detail.no_kit') + '</p>')
     + '</section>';
 
   root.innerHTML = html;
@@ -557,37 +581,38 @@ function renderKits(root) {
   var html = ''
     + '<section class="page">'
     +   '<header class="page-header">'
-    +     '<div><h1>Kits</h1><p class="muted">Cadastre o preço de cada kit pra ver o R$/cor.</p></div>'
-    +     '<a href="#/compare" class="btn-primary">Comparar kits →</a>'
+    +     '<div><h1>' + t('kits.title') + '</h1><p class="muted">' + t('kits.subtitle') + '</p></div>'
+    +     '<a href="#/compare" class="btn-primary">' + t('kits.compare_kits') + '</a>'
     +   '</header>'
-    +   '<details class="card"><summary style="cursor:pointer;font-weight:600;">+ Adicionar kit</summary>'
+    +   '<details class="card"><summary style="cursor:pointer;font-weight:600;">' + t('kits.add_kit') + '</summary>'
     +     '<form id="kitNewForm" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-    +       '<input type="text" name="name" placeholder="Nome (ex: Honolulu/B Classic 24)" required style="flex:1;min-width:260px;">'
-    +       '<input type="number" name="count" placeholder="Tamanho" min="0" value="0" required style="width:110px;">'
-    +       '<input type="text" name="variant" placeholder="Variante (WW, JP, …)" style="width:140px;">'
-    +       '<input type="text" name="price" inputmode="decimal" placeholder="Preço R$ (opcional)" style="width:160px;">'
-    +       '<button type="submit" class="btn-primary">Criar e editar cores</button>'
+    +       '<input type="text" name="name" placeholder="' + escapeAttr(t('kits.name_placeholder')) + '" required style="flex:1;min-width:260px;">'
+    +       '<input type="number" name="count" placeholder="' + escapeAttr(t('kits.size_placeholder')) + '" min="0" value="0" required style="width:110px;">'
+    +       '<input type="text" name="variant" placeholder="' + escapeAttr(t('kits.variant_placeholder')) + '" style="width:140px;">'
+    +       '<input type="text" name="price" inputmode="decimal" placeholder="' + escapeAttr(t('kits.price_placeholder')) + '" style="width:160px;">'
+    +       '<button type="submit" class="btn-primary">' + t('kits.create_and_edit') + '</button>'
     +     '</form>'
+    +     '<p class="muted small" style="margin-top:8px;">' + t('kits.add_kit_after') + '</p>'
     +   '</details>'
     +   '<div class="table-wrap"><table class="data-table">'
-    +     '<thead><tr><th>Kit</th><th class="num">Cores</th><th>Preço (R$)</th><th class="num">R$/cor</th><th></th></tr></thead>'
+    +     '<thead><tr><th>' + t('detail.kit') + '</th><th class="num">' + t('common.colors') + '</th><th>' + t('kits.price_brl') + '</th><th class="num">' + t('kits.price_per_color') + '</th><th></th></tr></thead>'
     +     '<tbody>'
     +     kits.map(function (k) {
             var actual = k.color_codes.length;
             var ppc = pricePerColor(k);
             return '<tr' + (k.enabled ? '' : ' class="kit-disabled"') + '>'
-              + '<td><div class="kit-name">' + escapeHtml(k.name) + (k.enabled ? '' : ' <span class="muted small">· desabilitado</span>') + '</div>'
-              +   '<div class="muted small">label: ' + kitLabel(k) + '</div></td>'
-              + '<td class="num">' + actual + (actual !== k.count ? ' <span class="muted small">(de ' + k.count + ')</span>' : '') + '</td>'
+              + '<td><div class="kit-name">' + escapeHtml(k.name) + (k.enabled ? '' : ' <span class="muted small">· ' + t('kits.disabled') + '</span>') + '</div>'
+              +   '<div class="muted small">' + t('kits.label_prefix') + ' ' + kitLabel(k) + '</div></td>'
+              + '<td class="num">' + actual + (actual !== k.count ? ' <span class="muted small">' + t('kits.of_n', { n: k.count }) + '</span>' : '') + '</td>'
               + '<td><form class="inline-form" data-kit-price="' + k.id + '">'
               +   '<input type="text" name="price" inputmode="decimal" placeholder="—" value="' + (k.price_brl != null ? k.price_brl.toFixed(2) : '') + '">'
-              +   '<button type="submit" class="btn-primary small">Salvar</button>'
+              +   '<button type="submit" class="btn-primary small">' + t('common.save') + '</button>'
               + '</form></td>'
               + '<td class="num">' + (ppc != null ? 'R$ ' + ppc.toFixed(2) : '—') + '</td>'
               + '<td>'
-              +   '<a href="#/kits/' + k.id + '/edit" class="btn-ghost small">Editar cores</a> '
-              +   '<a href="#/compare?a=' + k.id + '" class="btn-ghost small">Comparar</a> '
-              +   '<button type="button" class="btn-ghost small" data-kit-toggle="' + k.id + '">' + (k.enabled ? 'Desabilitar' : 'Habilitar') + '</button>'
+              +   '<a href="#/kits/' + k.id + '/edit" class="btn-ghost small">' + t('kits.edit_colors') + '</a> '
+              +   '<a href="#/compare?a=' + k.id + '" class="btn-ghost small">' + t('kits.compare') + '</a> '
+              +   '<button type="button" class="btn-ghost small" data-kit-toggle="' + k.id + '">' + (k.enabled ? t('kits.disable') : t('kits.enable')) + '</button>'
               + '</td></tr>';
           }).join('')
     +     '</tbody></table></div>'
@@ -600,13 +625,13 @@ function renderKits(root) {
     var name = f.name.value.trim();
     if (!name) return;
     if (state.kits.some(function (k) { return k.name === name; })) {
-      alert('Já existe um kit chamado "' + name + '"'); return;
+      alert(t('kits.duplicate_name', { name: name })); return;
     }
     var count = parseInt(f.count.value, 10) || 0;
     var variant = f.variant.value.trim() || null;
     var priceStr = f.price.value.trim().replace(',', '.');
     var price = priceStr ? parseFloat(priceStr) : null;
-    if (price != null && (isNaN(price) || price < 0)) { alert('preço inválido'); return; }
+    if (price != null && (isNaN(price) || price < 0)) { alert(t('kits.price_invalid')); return; }
     var maxSort = state.kits.reduce(function (m, k) { return Math.max(m, k.sort_order); }, 0);
     var newId = state._nextKitId || computeNextKitId();
     state._nextKitId = newId + 1;
@@ -624,7 +649,7 @@ function renderKits(root) {
       var k = findKit(id); if (!k) return;
       var v = f.price.value.trim().replace(',', '.');
       if (!v) k.price_brl = null;
-      else { var p = parseFloat(v); if (isNaN(p) || p < 0) { alert('preço inválido'); return; } k.price_brl = p; }
+      else { var p = parseFloat(v); if (isNaN(p) || p < 0) { alert(t('kits.price_invalid')); return; } k.price_brl = p; }
       saveState(); router();
     });
   });
@@ -642,31 +667,31 @@ function renderKits(root) {
 // ============================================================================
 function renderKitEdit(root, kitId) {
   var k = findKit(kitId);
-  if (!k) { root.innerHTML = '<section class="page"><h1>404</h1><p>Kit não encontrado.</p></section>'; return; }
+  if (!k) { root.innerHTML = '<section class="page"><h1>404</h1><p>Kit not found.</p></section>'; return; }
   var allColors = state.colors.slice().sort(function (a, b) { return a.sort_order - b.sort_order; });
 
   var html = ''
     + '<section class="page">'
     +   '<header class="page-header">'
-    +     '<div><h1>Editar cores · ' + escapeHtml(k.name) + '</h1>'
-    +       '<p class="muted">' + kitLabel(k) + ' declarado · <span id="kitCountLive">' + k.color_codes.length + '</span> cor(es) no kit</p></div>'
-    +     '<a href="#/kits" class="btn-ghost">← Voltar</a>'
+    +     '<div><h1>' + t('kit_edit.title', { name: escapeHtml(k.name) }) + '</h1>'
+    +       '<p class="muted">' + t('kit_edit.declared', { label: kitLabel(k), n: '<span id="kitCountLive">' + k.color_codes.length + '</span>' }) + '</p></div>'
+    +     '<a href="#/kits" class="btn-ghost">' + t('common.back') + '</a>'
     +   '</header>'
     +   '<form id="kitForm" class="card">'
-    +     '<h2 class="section-title">Lista de códigos do kit</h2>'
-    +     '<p class="muted small">Edita à mão ou clica nas cores abaixo (alterna entre selecionada/não). Salvar substitui a lista; códigos não cadastrados são ignorados.</p>'
+    +     '<h2 class="section-title">' + t('kit_edit.codes_list') + '</h2>'
+    +     '<p class="muted small">' + t('kit_edit.codes_help') + '</p>'
     +     '<textarea name="codes" id="kitCodes" rows="10" spellcheck="false"'
     +       ' style="width:100%;font-family:ui-monospace,\'SF Mono\',Menlo,Consolas,monospace;font-size:.9rem;padding:10px;border-radius:6px;background:var(--color-surface-alt);color:var(--color-text);border:1px solid var(--color-border);resize:vertical;">'
     +       k.color_codes.join('\n')
     +     '</textarea>'
     +     '<div style="margin-top:12px;display:flex;gap:8px;">'
-    +       '<button type="submit" class="btn-primary">Salvar lista</button>'
-    +       '<a href="#/kits/' + k.id + '/edit" class="btn-ghost">Recarregar</a>'
+    +       '<button type="submit" class="btn-primary">' + t('kit_edit.save_list') + '</button>'
+    +       '<a href="#/kits/' + k.id + '/edit" class="btn-ghost">' + t('common.reload') + '</a>'
     +     '</div>'
     +   '</form>'
-    +   '<h2 class="section-title">Catálogo</h2>'
+    +   '<h2 class="section-title">' + t('kit_edit.catalog') + '</h2>'
     +   '<div class="search" style="margin-bottom:12px;">'
-    +     '<input id="colorSearch" type="search" placeholder="Buscar por código atual, antigo (Honolulu/Oahu/Kaala) ou nome…" style="width:100%;max-width:480px;">'
+    +     '<input id="colorSearch" type="search" placeholder="' + escapeAttr(t('kit_edit.search_placeholder')) + '" style="width:100%;max-width:480px;">'
     +     '<span id="searchCount" class="muted small" style="margin-left:8px;align-self:center;"></span>'
     +   '</div>'
     +   '<div class="swatch-grid" id="colorPicker">'
@@ -677,7 +702,7 @@ function renderKitEdit(root, kitId) {
             var titleParts = [c.code];
             if (c.name) titleParts.push(c.name);
             if (c.old_honolulu || c.old_oahu || c.old_kaala) {
-              titleParts.push('antigos: ' + (c.old_honolulu || '–') + '/' + (c.old_oahu || '–') + '/' + (c.old_kaala || '–'));
+              titleParts.push(t('detail.olds') + ' ' + (c.old_honolulu || '–') + '/' + (c.old_oahu || '–') + '/' + (c.old_kaala || '–'));
             }
             return '<button type="button" class="swatch swatch-pickable' + (inKit ? ' is-on' : '') + '"'
               + ' data-code="' + c.code + '" data-search="' + escapeAttr(search) + '" title="' + escapeAttr(titleParts.join(' · ')) + '">'
@@ -727,7 +752,7 @@ function renderKitEdit(root, kitId) {
       b.style.display = match ? '' : 'none';
       if (match) visible++;
     });
-    searchCount.textContent = q ? (visible + ' de ' + picks.length) : '';
+    searchCount.textContent = q ? t('kit_edit.of_n_visible', { visible: visible, total: picks.length }) : '';
   });
   document.getElementById('kitForm').addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -737,8 +762,8 @@ function renderKitEdit(root, kitId) {
     var invalid = p.list.filter(function (c) { return !existing[c]; });
     k.color_codes = valid;
     saveState();
-    var msg = valid.length + ' cor(es) salva(s)';
-    if (invalid.length) msg += ' — ' + invalid.length + ' código(s) não existe(m): ' + invalid.slice(0, 10).join(', ') + (invalid.length > 10 ? '…' : '');
+    var msg = t('kit_edit.saved_n', { n: valid.length });
+    if (invalid.length) msg += t('kit_edit.invalid_n', { n: invalid.length, list: invalid.slice(0, 10).join(', ') + (invalid.length > 10 ? '…' : '') });
     alert(msg);
     router();
   });
@@ -771,7 +796,7 @@ function renderCompare(root, query) {
               + '</div></div>';
           }).join('')
     +   '</div>'
-    +   '<div class="kit-picker-actions"><button type="submit" class="btn-primary">Comparar</button> <a href="#/compare" class="btn-ghost">Limpar</a></div>'
+    +   '<div class="kit-picker-actions"><button type="submit" class="btn-primary">' + t('compare.compare_btn') + '</button> <a href="#/compare" class="btn-ghost">' + t('common.clear') + '</a></div>'
     + '</form>';
 
   var body = '';
@@ -787,8 +812,8 @@ function renderCompare(root, query) {
   root.innerHTML = ''
     + '<section class="page">'
     +   '<header class="page-header"><div>'
-    +     '<h1>Comparar kits</h1>'
-    +     '<p class="muted">Marque kits em <strong>A</strong> e/ou <strong>B</strong>. Só A (ou só B) = comparação por kit. A + B = união-A vs união-B.</p>'
+    +     '<h1>' + t('compare.title') + '</h1>'
+    +     '<p class="muted">' + t('compare.subtitle') + '</p>'
     +   '</div></header>'
     +   picker
     +   body
@@ -868,15 +893,15 @@ function renderCompareGroup(allKits, aSet, bSet) {
   var bHasPrice = bKits.some(function (k) { return k.price_brl != null; });
 
   var summary = '<div class="compare-summary" id="cmpSummary">'
-    + statBtn('a', 'Seleção A', aCodes.size, aKits.length + ' kit(s)' + (aHasPrice ? ' · R$ ' + aTotal.toFixed(2) : ''))
-    + statBtn('b', 'Seleção B', bCodes.size, bKits.length + ' kit(s)' + (bHasPrice ? ' · R$ ' + bTotal.toFixed(2) : ''))
-    + statBtn('both', 'Em ambas (A ∩ B)', inter)
-    + statBtn('a-only', 'Só em A', aOnly)
-    + statBtn('b-only', 'Só em B', bOnly)
-    + (aKits.length >= 2 ? statBtn('a-overlap', 'Repetidas em A', aOverlap, 'em 2+ dos ' + aKits.length + ' kits') : '')
-    + (bKits.length >= 2 ? statBtn('b-overlap', 'Repetidas em B', bOverlap, 'em 2+ dos ' + bKits.length + ' kits') : '')
-    + statBtn('overlap', 'Repetidas (total)', overlap)
-    + statBtn('all', 'União (A ∪ B)', allCodes.size)
+    + statBtn('a', t('compare.selection_a'), aCodes.size, t('compare.n_kits', { n: aKits.length }) + (aHasPrice ? ' · R$ ' + aTotal.toFixed(2) : ''))
+    + statBtn('b', t('compare.selection_b'), bCodes.size, t('compare.n_kits', { n: bKits.length }) + (bHasPrice ? ' · R$ ' + bTotal.toFixed(2) : ''))
+    + statBtn('both', t('compare.in_both'), inter)
+    + statBtn('a-only', t('compare.only_a'), aOnly)
+    + statBtn('b-only', t('compare.only_b'), bOnly)
+    + (aKits.length >= 2 ? statBtn('a-overlap', t('compare.repeated_a'), aOverlap, t('compare.in_2_plus_of_n', { n: aKits.length })) : '')
+    + (bKits.length >= 2 ? statBtn('b-overlap', t('compare.repeated_b'), bOverlap, t('compare.in_2_plus_of_n', { n: bKits.length })) : '')
+    + statBtn('overlap', t('compare.repeated_total'), overlap)
+    + statBtn('all', t('compare.union'), allCodes.size)
     + '</div>';
 
   var legend = '<div class="cmp-legend">'
@@ -886,7 +911,7 @@ function renderCompareGroup(allKits, aSet, bSet) {
 
   var grid = '<div class="compare-grid" id="cmpGrid">' + rows.map(function (r) {
     var c = r.color;
-    var ttl = c.code + ' · A: ' + r.a_kits_with + '/' + aKits.length + ' kit(s) · B: ' + r.b_kits_with + '/' + bKits.length + ' kit(s)' + (c.hex ? ' · #' + c.hex : '');
+    var ttl = c.code + ' · A: ' + r.a_kits_with + '/' + aKits.length + ' · B: ' + r.b_kits_with + '/' + bKits.length + (c.hex ? ' · #' + c.hex : '');
     return '<a class="cmp-cell' + (r.shared === 2 ? ' is-all' : (r.shared === 1 ? ' is-unique' : '')) + '"'
       + ' data-in-a="' + (r.in_a ? '1' : '0') + '" data-in-b="' + (r.in_b ? '1' : '0') + '"'
       + ' data-a-count="' + r.a_kits_with + '" data-b-count="' + r.b_kits_with + '" data-kit-count="' + r.kit_count + '"'
@@ -894,12 +919,12 @@ function renderCompareGroup(allKits, aSet, bSet) {
       + '<span class="cmp-chip' + (c.hex ? '' : ' swatch-broken') + '"' + (c.hex ? ' style="background:#' + c.hex + '"' : '') + '>' + (c.hex ? '' : '?') + '</span>'
       + '<span class="cmp-code">' + c.code + '</span>'
       + '<span class="cmp-flags">'
-      +   '<span class="cmp-flag k-1' + (r.in_a ? ' is-on' : '') + '" title="Em ' + r.a_kits_with + ' kit(s) de A">A' + (r.a_kits_with > 1 ? '<small>' + r.a_kits_with + '</small>' : '') + '</span>'
-      +   '<span class="cmp-flag k-2' + (r.in_b ? ' is-on' : '') + '" title="Em ' + r.b_kits_with + ' kit(s) de B">B' + (r.b_kits_with > 1 ? '<small>' + r.b_kits_with + '</small>' : '') + '</span>'
+      +   '<span class="cmp-flag k-1' + (r.in_a ? ' is-on' : '') + '" title="' + escapeAttr(t('compare.in_n_a', { n: r.a_kits_with })) + '">A' + (r.a_kits_with > 1 ? '<small>' + r.a_kits_with + '</small>' : '') + '</span>'
+      +   '<span class="cmp-flag k-2' + (r.in_b ? ' is-on' : '') + '" title="' + escapeAttr(t('compare.in_n_b', { n: r.b_kits_with })) + '">B' + (r.b_kits_with > 1 ? '<small>' + r.b_kits_with + '</small>' : '') + '</span>'
       + '</span></a>';
   }).join('') + '</div>';
 
-  return summary + '<h2 class="section-title">Cores</h2><p class="muted">Verde = nas duas seleções. Amarela = exclusiva de uma.</p>' + legend + grid;
+  return summary + '<h2 class="section-title">' + t('compare.colors_section') + '</h2><p class="muted">' + t('compare.legend_help') + '</p>' + legend + grid;
 }
 
 function statBtn(filter, label, value, sub) {
@@ -941,14 +966,14 @@ function renderCompareLegacy(allKits, selIds) {
   sel.forEach(function (k) { if (k.price_brl != null) { totalPrice += k.price_brl; hasPrice = true; } });
 
   var summary = '<div class="compare-summary">'
-    + '<div class="stat"><div class="stat-label">Kits selecionados</div><div class="stat-value">' + sel.length + '</div></div>'
-    + '<div class="stat"><div class="stat-label">Cores únicas (união)</div><div class="stat-value">' + union + '</div></div>'
-    + '<div class="stat"><div class="stat-label">Em todos (interseção)</div><div class="stat-value">' + intersection + '</div></div>'
-    + (hasPrice ? '<div class="stat"><div class="stat-label">Custo total</div><div class="stat-value">R$ ' + totalPrice.toFixed(2) + '</div></div>'
-        + '<div class="stat"><div class="stat-label">R$/cor (união)</div><div class="stat-value">' + (union ? 'R$ ' + (totalPrice / union).toFixed(2) : '—') + '</div></div>' : '')
+    + '<div class="stat"><div class="stat-label">' + t('compare.kits_selected') + '</div><div class="stat-value">' + sel.length + '</div></div>'
+    + '<div class="stat"><div class="stat-label">' + t('compare.unique_colors') + '</div><div class="stat-value">' + union + '</div></div>'
+    + '<div class="stat"><div class="stat-label">' + t('compare.in_all') + '</div><div class="stat-value">' + intersection + '</div></div>'
+    + (hasPrice ? '<div class="stat"><div class="stat-label">' + t('compare.total_cost') + '</div><div class="stat-value">R$ ' + totalPrice.toFixed(2) + '</div></div>'
+        + '<div class="stat"><div class="stat-label">' + t('compare.cost_per_color') + '</div><div class="stat-value">' + (union ? 'R$ ' + (totalPrice / union).toFixed(2) : '—') + '</div></div>' : '')
     + '</div>';
 
-  var statsTable = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Kit</th><th class="num">Cores</th><th class="num">Exclusivas</th><th class="num">Compart.</th><th class="num">Preço</th><th class="num">R$/cor</th></tr></thead><tbody>'
+  var statsTable = '<div class="table-wrap"><table class="data-table"><thead><tr><th>' + t('detail.kit') + '</th><th class="num">' + t('common.colors') + '</th><th class="num">' + t('compare.exclusive_to_this') + '</th><th class="num">' + t('compare.shared') + '</th><th class="num">' + t('common.price') + '</th><th class="num">' + t('kits.price_per_color') + '</th></tr></thead><tbody>'
     + sel.map(function (k) {
         var pk = perKit[k.id]; var ppc = pricePerColor(k);
         return '<tr><td>' + escapeHtml(k.name) + '</td>'
@@ -975,7 +1000,7 @@ function renderCompareLegacy(allKits, selIds) {
         }).join('') + '</span></a>';
   }).join('') + '</div>';
 
-  return summary + statsTable + '<h2 class="section-title">Cores na união</h2>' + legend + grid;
+  return summary + statsTable + '<h2 class="section-title">' + t('compare.union_section') + '</h2><p class="muted">' + t('compare.legacy_help') + '</p>' + legend + grid;
 }
 
 function attachCompareFilters() {
@@ -1019,22 +1044,22 @@ function attachCompareFilters() {
 function renderAdmin(root) {
   root.innerHTML = ''
     + '<section class="page">'
-    +   '<header class="page-header"><div><h1>Admin</h1><p class="muted">Estado vive em <code>localStorage</code> deste navegador. Exporta um JSON pra backup ou pra mover entre máquinas.</p></div><a href="#/" class="btn-ghost">← Voltar</a></header>'
-    +   '<div class="card"><h2 class="section-title">Exportar DB completo</h2>'
-    +     '<p class="muted small">Baixa um JSON com todas as cores, kits e relações kit↔cor.</p>'
-    +     '<button id="btnExport" class="btn-primary">Baixar JSON</button>'
+    +   '<header class="page-header"><div><h1>' + t('admin.title') + '</h1><p class="muted">' + t('admin.subtitle') + '</p></div><a href="#/" class="btn-ghost">' + t('common.back') + '</a></header>'
+    +   '<div class="card"><h2 class="section-title">' + t('admin.export_title') + '</h2>'
+    +     '<p class="muted small">' + t('admin.export_help') + '</p>'
+    +     '<button id="btnExport" class="btn-primary">' + t('admin.export_button') + '</button>'
     +   '</div>'
-    +   '<div class="card"><h2 class="section-title">Importar DB completo</h2>'
-    +     '<p class="muted small">Sobe um JSON exportado anteriormente. <strong>Substitui</strong> tudo neste navegador.</p>'
+    +   '<div class="card"><h2 class="section-title">' + t('admin.import_title') + '</h2>'
+    +     '<p class="muted small">' + t('admin.import_help') + '</p>'
     +     '<input type="file" id="fileImport" accept=".json,application/json">'
-    +     '<button id="btnImport" class="btn-primary">Importar (substitui tudo)</button>'
+    +     '<button id="btnImport" class="btn-primary">' + t('admin.import_button') + '</button>'
     +   '</div>'
-    +   '<div class="card"><h2 class="section-title">Reset</h2>'
-    +     '<p class="muted small">Apaga as alterações locais e recarrega a snapshot original (<code>db.json</code> bundled).</p>'
-    +     '<button id="btnReset" class="btn-ghost">Resetar pra snapshot inicial</button>'
+    +   '<div class="card"><h2 class="section-title">' + t('admin.reset_title') + '</h2>'
+    +     '<p class="muted small">' + t('admin.reset_help') + '</p>'
+    +     '<button id="btnReset" class="btn-ghost">' + t('admin.reset_button') + '</button>'
     +   '</div>'
-    +   '<div class="card"><h2 class="section-title">Stats</h2>'
-    +     '<p>Cores: <strong>' + state.colors.length + '</strong> · Kits: <strong>' + state.kits.length + '</strong> · Habilitados: <strong>' + enabledKits().length + '</strong></p>'
+    +   '<div class="card"><h2 class="section-title">' + t('admin.stats_title') + '</h2>'
+    +     '<p>' + t('admin.stats_line', { c: state.colors.length, k: state.kits.length, e: enabledKits().length }) + '</p>'
     +   '</div>'
     + '</section>';
 
@@ -1044,17 +1069,17 @@ function renderAdmin(root) {
   });
   document.getElementById('btnImport').addEventListener('click', function () {
     var f = document.getElementById('fileImport').files[0];
-    if (!f) { alert('Selecione um arquivo'); return; }
-    if (!confirm('Vai apagar e recriar TUDO neste navegador. Confirma?')) return;
+    if (!f) { alert(t('admin.import_pick')); return; }
+    if (!confirm(t('admin.import_confirm'))) return;
     var fr = new FileReader();
     fr.onload = function () {
-      try { var data = JSON.parse(fr.result); importDb(data, true); router(); alert('Importado!'); }
-      catch (e) { alert('JSON inválido: ' + e.message); }
+      try { var data = JSON.parse(fr.result); importDb(data, true); router(); alert(t('admin.import_done')); }
+      catch (e) { alert(t('admin.import_invalid', { err: e.message })); }
     };
     fr.readAsText(f);
   });
   document.getElementById('btnReset').addEventListener('click', function () {
-    if (!confirm('Apaga estado local e recarrega o db.json bundled. Confirma?')) return;
+    if (!confirm(t('admin.reset_confirm'))) return;
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     location.reload();
   });
@@ -1070,10 +1095,21 @@ document.getElementById('theme-toggle').addEventListener('click', function () {
   try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
 });
 
+(function () {
+  var sel = document.getElementById('lang-select');
+  if (!sel) return;
+  sel.value = lang;
+  sel.addEventListener('change', function () { setLang(sel.value); });
+  document.documentElement.setAttribute('lang', lang === 'pt' ? 'pt-BR' : 'en');
+  document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+})();
+
 window.addEventListener('hashchange', router);
 
 loadState().then(router).catch(function (err) {
-  document.getElementById('app').innerHTML = '<section class="page"><h1>Erro</h1><pre>' + escapeHtml(err.message) + '</pre></section>';
+  document.getElementById('app').innerHTML = '<section class="page"><h1>' + t('admin.error') + '</h1><pre>' + escapeHtml(err.message) + '</pre></section>';
 });
 
 })();
