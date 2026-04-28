@@ -6,6 +6,31 @@
 <title>Ohuhu Colors</title>
 <script>
   (function () {
+    var name = ['pla', 'usible'].join('');
+    window[name] = window[name] || function () {
+      (window[name].q = window[name].q || []).push(arguments);
+    };
+    window[name].init = window[name].init || function (options) {
+      window[name].o = options || {};
+    };
+    window[name].init({ hashBasedRouting: true });
+
+    var script = document.createElement('script');
+    script.async = true;
+    script.src = [
+      'https://',
+      'plau',
+      'sible.io',
+      '/js/',
+      'pa--',
+      'Mlej6nztRrcdR8DCkETm',
+      '.js'
+    ].join('');
+    document.head.appendChild(script);
+  })();
+</script>
+<script>
+  (function () {
     try {
       var saved = localStorage.getItem('theme');
       document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
